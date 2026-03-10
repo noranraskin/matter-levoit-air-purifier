@@ -159,7 +159,7 @@ extern "C" void app_main()
         air_purifier::config_t config;
         config.fan_control.fan_mode = 0;          /* Off */
         config.fan_control.fan_mode_sequence = 0; /* Off/Low/Med/High/Auto */
-        config.fan_control.percent_setting = 0;
+        config.fan_control.percent_setting = static_cast<uint8_t>(0);
         config.fan_control.percent_current = 0;
 
         endpoint_t *ep = air_purifier::create(node, &config, ENDPOINT_FLAG_NONE, levoit_handle);
@@ -173,7 +173,7 @@ extern "C" void app_main()
 
         fan_control::feature::multi_speed::config_t multispeed;
         multispeed.speed_max = 3;
-        multispeed.speed_setting = 0;
+        multispeed.speed_setting = static_cast<uint8_t>(0);
         multispeed.speed_current = 0;
         fan_control::feature::multi_speed::add(fan_cluster, &multispeed);
 
@@ -191,10 +191,10 @@ extern "C" void app_main()
         hepa_filter_monitoring::create(ep, &hepa_config, CLUSTER_FLAG_SERVER);
 
         /* Add Mode Select cluster (Operating Mode: Manual / Sleep / Auto) */
-        mode_select::config_t mode_config;
+        cluster::mode_select::config_t mode_config;
         snprintf(mode_config.description, sizeof(mode_config.description), "Operating Mode");
         mode_config.current_mode = 0; /* Manual */
-        mode_select::create(ep, &mode_config, CLUSTER_FLAG_SERVER);
+        cluster::mode_select::create(ep, &mode_config, CLUSTER_FLAG_SERVER);
 
         /*
          * TODO: Add supported modes to Mode Select cluster
@@ -232,10 +232,10 @@ extern "C" void app_main()
      *  Endpoint 3: Display Power (On/Off Plugin Unit)
      * ──────────────────────────────────────────────────────────── */
     {
-        on_off_plugin_unit::config_t config;
+        on_off_plug_in_unit::config_t config;
         config.on_off.on_off = true; /* Display on by default */
 
-        endpoint_t *ep = on_off_plugin_unit::create(node, &config, ENDPOINT_FLAG_NONE, levoit_handle);
+        endpoint_t *ep = on_off_plug_in_unit::create(node, &config, ENDPOINT_FLAG_NONE, levoit_handle);
         ABORT_APP_ON_FAILURE(ep != nullptr, ESP_LOGE(TAG, "Failed to create display power endpoint"));
         display_power_endpoint_id = endpoint::get_id(ep);
         ESP_LOGI(TAG, "Display Power endpoint created: %d", display_power_endpoint_id);
@@ -245,10 +245,10 @@ extern "C" void app_main()
      *  Endpoint 4: Display Lock (On/Off Plugin Unit)
      * ──────────────────────────────────────────────────────────── */
     {
-        on_off_plugin_unit::config_t config;
+        on_off_plug_in_unit::config_t config;
         config.on_off.on_off = false; /* Not locked by default */
 
-        endpoint_t *ep = on_off_plugin_unit::create(node, &config, ENDPOINT_FLAG_NONE, levoit_handle);
+        endpoint_t *ep = on_off_plug_in_unit::create(node, &config, ENDPOINT_FLAG_NONE, levoit_handle);
         ABORT_APP_ON_FAILURE(ep != nullptr, ESP_LOGE(TAG, "Failed to create display lock endpoint"));
         display_lock_endpoint_id = endpoint::get_id(ep);
         ESP_LOGI(TAG, "Display Lock endpoint created: %d", display_lock_endpoint_id);
