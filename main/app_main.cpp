@@ -1,9 +1,13 @@
 /*
  * Matter Levoit Core 300S Air Purifier — Main Entry Point
  *
- * Creates the Matter data model with:
- *   Endpoint 1: Air Purifier (Fan Control + On/Off + HEPA Filter + Mode Select)
- *   Endpoint 2: Air Quality Sensor (Air Quality + PM2.5 Concentration)
+ * MINIMAL BUILD: Only the Air Purifier endpoint (Fan Control + On/Off).
+ * Additional endpoints and clusters are commented out until commissioning
+ * is verified working.
+ *
+ * Full build adds:
+ *   Endpoint 1: Air Purifier (+ HEPA Filter Monitoring + Mode Select)
+ *   Endpoint 2: Air Quality Sensor (Air Quality + PM2.5)
  *   Endpoint 3: Display Power (On/Off Plugin Unit)
  *   Endpoint 4: Display Lock (On/Off Plugin Unit)
  */
@@ -22,7 +26,28 @@
 #include <app/server/CommissioningWindowManager.h>
 #include <app/server/Server.h>
 
+/* TODO: Re-enable when adding HEPA Filter Monitoring back
+#include <app/clusters/resource-monitoring-server/ResourceMonitoringDelegate.h>
+*/
+
 static const char *TAG = "app_main";
+
+/* TODO: Re-enable HEPA Filter Monitoring delegate when adding cluster back
+class HepaFilterDelegate : public chip::app::Clusters::ResourceMonitoring::Delegate
+{
+public:
+    CHIP_ERROR Init() override { return CHIP_NO_ERROR; }
+    chip::Protocols::InteractionModel::Status PreResetCondition() override
+    {
+        return chip::Protocols::InteractionModel::Status::Success;
+    }
+    chip::Protocols::InteractionModel::Status PostResetCondition() override
+    {
+        return chip::Protocols::InteractionModel::Status::Success;
+    }
+};
+static HepaFilterDelegate hepa_filter_delegate;
+*/
 
 using namespace esp_matter;
 using namespace esp_matter::attribute;
@@ -32,9 +57,13 @@ using namespace chip::app::Clusters;
 
 /* ── Endpoint IDs (filled in during setup) ── */
 uint16_t air_purifier_endpoint_id = 0;
+/* TODO: Re-enable additional endpoint IDs when adding endpoints back
 uint16_t air_quality_sensor_endpoint_id = 0;
 uint16_t display_power_endpoint_id = 0;
 uint16_t display_lock_endpoint_id = 0;
+*/
+
+constexpr auto k_timeout_seconds = 300;
 
 /* ── Event Callback ── */
 static void app_event_cb(const ChipDeviceEvent *event, intptr_t arg)
@@ -73,7 +102,7 @@ static void app_event_cb(const ChipDeviceEvent *event, intptr_t arg)
             chip::CommissioningWindowManager &commissionMgr =
                 chip::Server::GetInstance().GetCommissioningWindowManager();
             constexpr auto kTimeoutSeconds =
-                chip::System::Clock::Seconds16(COMMISSIONING_TIMEOUT_S);
+                chip::System::Clock::Seconds16(k_timeout_seconds);
             if (!commissionMgr.IsCommissioningWindowOpen())
             {
                 CHIP_ERROR err = commissionMgr.OpenBasicCommissioningWindow(
@@ -124,8 +153,8 @@ static esp_err_t app_attribute_update_cb(attribute::callback_type_t type, uint16
 {
     if (type == PRE_UPDATE)
     {
-        app_driver_handle_t driver_handle = (app_driver_handle_t)priv_data;
-        return app_driver_attribute_update(driver_handle, endpoint_id, cluster_id, attribute_id, val);
+        ESP_LOGI(TAG, "Attribute update: ep=%d cluster=0x%04lx attr=0x%04lx",
+                 endpoint_id, (unsigned long)cluster_id, (unsigned long)attribute_id);
     }
     return ESP_OK;
 }
@@ -135,11 +164,15 @@ extern "C" void app_main()
 {
     esp_err_t err = ESP_OK;
 
-    /* Initialize NVS */
-    nvs_flash_init();
-
-    /* Initialize Levoit UART driver */
-    app_driver_handle_t levoit_handle = app_driver_levoit_init();
+    /* Initialize NVS — with error recovery for corrupted partitions */
+    err = nvs_flash_init();
+    if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND)
+    {
+        ESP_LOGW(TAG, "NVS init failed (0x%x), erasing and retrying...", err);
+        ESP_ERROR_CHECK(nvs_flash_erase());
+        err = nvs_flash_init();
+    }
+    ESP_ERROR_CHECK(err);
 
     /* ────────────────────────────────────────────────────────────
      *  Create Matter Node (Root Node on Endpoint 0)
@@ -149,20 +182,25 @@ extern "C" void app_main()
     ABORT_APP_ON_FAILURE(node != nullptr, ESP_LOGE(TAG, "Failed to create Matter node"));
 
     /* ────────────────────────────────────────────────────────────
-     *  Endpoint 1: Air Purifier
-     *  - Fan Control cluster (mandatory for air purifier device type)
-     *  - On/Off cluster (master power)
-     *  - HEPA Filter Monitoring cluster
-     *  - Mode Select cluster (Manual / Sleep / Auto)
+     *  Endpoint 1: Air Purifier (MINIMAL — Fan Control + On/Off only)
+     *
+     *  The air_purifier::create() gives us:
+     *    - Descriptor cluster (automatic)
+     *    - Identify cluster (automatic)
+     *    - Fan Control cluster (mandatory for Air Purifier device type)
+     *
+     *  We add On/Off and the Multi-Speed + Auto features for Fan Control.
+     *  HEPA Filter Monitoring and Mode Select are commented out until
+     *  commissioning is verified working.
      * ──────────────────────────────────────────────────────────── */
     {
         air_purifier::config_t config;
         config.fan_control.fan_mode = 0;          /* Off */
-        config.fan_control.fan_mode_sequence = 0; /* Off/Low/Med/High/Auto */
+        config.fan_control.fan_mode_sequence = 2; /* Off/Low/Med/High/Auto */
         config.fan_control.percent_setting = static_cast<uint8_t>(0);
         config.fan_control.percent_current = 0;
 
-        endpoint_t *ep = air_purifier::create(node, &config, ENDPOINT_FLAG_NONE, levoit_handle);
+        endpoint_t *ep = air_purifier::create(node, &config, ENDPOINT_FLAG_NONE, nullptr);
         ABORT_APP_ON_FAILURE(ep != nullptr, ESP_LOGE(TAG, "Failed to create air purifier endpoint"));
         air_purifier_endpoint_id = endpoint::get_id(ep);
         ESP_LOGI(TAG, "Air Purifier endpoint created: %d", air_purifier_endpoint_id);
@@ -185,74 +223,69 @@ extern "C" void app_main()
         on_off_config.on_off = false;
         on_off::create(ep, &on_off_config, CLUSTER_FLAG_SERVER);
 
-        /* Add HEPA Filter Monitoring cluster */
+        /* TODO: Re-enable HEPA Filter Monitoring when commissioning works
         hepa_filter_monitoring::config_t hepa_config;
-        hepa_config.delegate = nullptr;
-        hepa_filter_monitoring::create(ep, &hepa_config, CLUSTER_FLAG_SERVER);
+        hepa_config.delegate = static_cast<void *>(&hepa_filter_delegate);
+        cluster_t *hepa_cluster = hepa_filter_monitoring::create(ep, &hepa_config, CLUSTER_FLAG_SERVER);
+        ABORT_APP_ON_FAILURE(hepa_cluster != nullptr, ESP_LOGE(TAG, "Failed to create HEPA filter monitoring cluster"));
+        attribute::create(hepa_cluster,
+                          HepaFilterMonitoring::Attributes::DegradationDirection::Id,
+                          ATTRIBUTE_FLAG_NONE, esp_matter_enum8(1));
+        attribute::create(hepa_cluster,
+                          HepaFilterMonitoring::Attributes::Condition::Id,
+                          ATTRIBUTE_FLAG_NONE, esp_matter_uint8(100));
+        resource_monitoring::feature::condition::config_t cond_feat;
+        cond_feat.degradation_direction = 1;
+        cond_feat.condition = 100;
+        resource_monitoring::feature::condition::add(hepa_cluster, &cond_feat);
+        */
 
-        /* Add Mode Select cluster (Operating Mode: Manual / Sleep / Auto) */
+        /* TODO: Re-enable Mode Select when commissioning works
         cluster::mode_select::config_t mode_config;
         snprintf(mode_config.description, sizeof(mode_config.description), "Operating Mode");
-        mode_config.current_mode = 0; /* Manual */
+        mode_config.current_mode = 0;
         cluster::mode_select::create(ep, &mode_config, CLUSTER_FLAG_SERVER);
-
-        /*
-         * TODO: Add supported modes to Mode Select cluster
-         * The supported_modes attribute needs to be populated with:
-         *   Mode 0: "Manual"
-         *   Mode 1: "Sleep"
-         *   Mode 2: "Auto"
-         * This requires using the mode_select delegate or direct attribute manipulation.
-         */
+        // NOTE: Must also add supported_modes entries (Manual/Sleep/Auto)
+        */
     }
 
-    /* ────────────────────────────────────────────────────────────
-     *  Endpoint 2: Air Quality Sensor
-     *  - Air Quality cluster
-     *  - PM2.5 Concentration Measurement cluster
-     * ──────────────────────────────────────────────────────────── */
+    /* TODO: Re-enable Endpoint 2 (Air Quality Sensor) when commissioning works
     {
         air_quality_sensor::config_t config;
-
         endpoint_t *ep = air_quality_sensor::create(node, &config, ENDPOINT_FLAG_NONE, nullptr);
         ABORT_APP_ON_FAILURE(ep != nullptr, ESP_LOGE(TAG, "Failed to create air quality sensor endpoint"));
         air_quality_sensor_endpoint_id = endpoint::get_id(ep);
         ESP_LOGI(TAG, "Air Quality Sensor endpoint created: %d", air_quality_sensor_endpoint_id);
 
-        /* Add PM2.5 Concentration Measurement cluster */
         pm25_concentration_measurement::config_t pm25_config;
-        pm25_config.measurement_medium = 0; /* Air */
-        /* Enable numeric measurement feature for actual µg/m³ values */
+        pm25_config.measurement_medium = 0;
         pm25_config.feature_flags = concentration_measurement::feature::numeric_measurement::get_id();
-        pm25_config.features.numeric_measurement.measurement_unit = 0; /* PPM — mapped to µg/m³ in practice */
+        pm25_config.features.numeric_measurement.measurement_unit = 0;
         pm25_concentration_measurement::create(ep, &pm25_config, CLUSTER_FLAG_SERVER);
     }
+    */
 
-    /* ────────────────────────────────────────────────────────────
-     *  Endpoint 3: Display Power (On/Off Plugin Unit)
-     * ──────────────────────────────────────────────────────────── */
+    /* TODO: Re-enable Endpoint 3 (Display Power) when commissioning works
     {
         on_off_plug_in_unit::config_t config;
-        config.on_off.on_off = true; /* Display on by default */
-
-        endpoint_t *ep = on_off_plug_in_unit::create(node, &config, ENDPOINT_FLAG_NONE, levoit_handle);
+        config.on_off.on_off = true;
+        endpoint_t *ep = on_off_plug_in_unit::create(node, &config, ENDPOINT_FLAG_NONE, nullptr);
         ABORT_APP_ON_FAILURE(ep != nullptr, ESP_LOGE(TAG, "Failed to create display power endpoint"));
         display_power_endpoint_id = endpoint::get_id(ep);
         ESP_LOGI(TAG, "Display Power endpoint created: %d", display_power_endpoint_id);
     }
+    */
 
-    /* ────────────────────────────────────────────────────────────
-     *  Endpoint 4: Display Lock (On/Off Plugin Unit)
-     * ──────────────────────────────────────────────────────────── */
+    /* TODO: Re-enable Endpoint 4 (Display Lock) when commissioning works
     {
         on_off_plug_in_unit::config_t config;
-        config.on_off.on_off = false; /* Not locked by default */
-
-        endpoint_t *ep = on_off_plug_in_unit::create(node, &config, ENDPOINT_FLAG_NONE, levoit_handle);
+        config.on_off.on_off = false;
+        endpoint_t *ep = on_off_plug_in_unit::create(node, &config, ENDPOINT_FLAG_NONE, nullptr);
         ABORT_APP_ON_FAILURE(ep != nullptr, ESP_LOGE(TAG, "Failed to create display lock endpoint"));
         display_lock_endpoint_id = endpoint::get_id(ep);
         ESP_LOGI(TAG, "Display Lock endpoint created: %d", display_lock_endpoint_id);
     }
+    */
 
     /* ────────────────────────────────────────────────────────────
      *  Start Matter
@@ -261,16 +294,13 @@ extern "C" void app_main()
     ABORT_APP_ON_FAILURE(err == ESP_OK, ESP_LOGE(TAG, "Failed to start Matter, err:%d", err));
 
     ESP_LOGI(TAG, "Matter stack started successfully");
-    ESP_LOGI(TAG, "Endpoints: AirPurifier=%d, AirQuality=%d, DisplayPower=%d, DisplayLock=%d",
-             air_purifier_endpoint_id, air_quality_sensor_endpoint_id,
-             display_power_endpoint_id, display_lock_endpoint_id);
+    ESP_LOGI(TAG, "Air Purifier endpoint: %d", air_purifier_endpoint_id);
 
     /* ── Console commands (for development) ── */
 #if CONFIG_ENABLE_CHIP_SHELL
     esp_matter::console::diagnostics_register_commands();
     esp_matter::console::wifi_register_commands();
     esp_matter::console::factoryreset_register_commands();
-    esp_matter::console::attribute_register_commands();
     esp_matter::console::init();
 #endif
 

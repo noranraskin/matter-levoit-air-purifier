@@ -10,8 +10,10 @@ CONFIG_LWIP_IPV6_AUTOCONFIG=y
 CONFIG_LWIP_HOOK_IP6_ROUTE_DEFAULT=y
 CONFIG_LWIP_HOOK_ND6_GET_GW_DEFAULT=y
 CONFIG_LWIP_IPV6_NUM_ADDRESSES=6
+
+# Disable SoftAP — not needed for BLE-based commissioning.
+# (All official esp-matter examples also disable this.)
 CONFIG_ESP_WIFI_SOFTAP_SUPPORT=n
-CONFIG_ENABLE_WIFI_AP=n
 
 # ── Partition Table ──
 CONFIG_PARTITION_TABLE_CUSTOM=y
@@ -23,8 +25,12 @@ CONFIG_DEVICE_VENDOR_ID=0xFFF1
 CONFIG_DEVICE_PRODUCT_ID=0x8001
 
 # ── Commissioning / Pairing ──
-CONFIG_USE_TEST_SETUP_PIN_CODE=20242025
-CONFIG_USE_TEST_SETUP_DISCRIMINATOR=0xCAF
+# NOTE: On ESP32, the Kconfig symbols for passcode/discriminator are not
+# sourced by the platform Kconfig. The device uses CHIP's compiled defaults:
+#   Discriminator: 3840 (0xF00)
+#   Passcode: 20202021
+# These cannot be changed via sdkconfig on ESP32 — they are set at compile
+# time in the connectedhomeip SDK.
 
 # ── Matter Console (useful for development / factory reset via serial) ──
 CONFIG_ENABLE_CHIP_SHELL=y
@@ -38,19 +44,23 @@ CONFIG_MBEDTLS_HKDF_C=y
 # ── FreeRTOS ──
 CONFIG_FREERTOS_UNICORE=y
 
-# ── Dynamic Endpoints (Root + AirPurifier + AirQualitySensor + DisplayPower + DisplayLock) ──
-CONFIG_ESP_MATTER_MAX_DYNAMIC_ENDPOINT_COUNT=5
+# ── Dynamic Endpoints ──
+# Set higher than needed to leave room for internal endpoints (OTA, etc.)
+# Currently using 1 endpoint (Air Purifier), full build uses 4.
+CONFIG_ESP_MATTER_MAX_DYNAMIC_ENDPOINT_COUNT=8
 
 # ── Button ──
 CONFIG_BUTTON_PERIOD_TIME_MS=20
 CONFIG_BUTTON_LONG_PRESS_TIME_MS=5000
 
-# ── Enable clusters we need ──
+# ── Enable only clusters we need for minimal build ──
 CONFIG_SUPPORT_FAN_CONTROL_CLUSTER=y
-CONFIG_SUPPORT_AIR_QUALITY_CLUSTER=y
-CONFIG_SUPPORT_HEPA_FILTER_MONITORING_CLUSTER=y
-CONFIG_SUPPORT_PM2_5_CONCENTRATION_MEASUREMENT_CLUSTER=y
-CONFIG_SUPPORT_MODE_SELECT_CLUSTER=y
+
+# ── Clusters needed for full build (disabled for now) ──
+CONFIG_SUPPORT_AIR_QUALITY_CLUSTER=n
+CONFIG_SUPPORT_HEPA_FILTER_MONITORING_CLUSTER=n
+CONFIG_SUPPORT_PM2_5_CONCENTRATION_MEASUREMENT_CLUSTER=n
+CONFIG_SUPPORT_MODE_SELECT_CLUSTER=n
 
 # ── Disable unused clusters to save flash ──
 CONFIG_SUPPORT_ACCOUNT_LOGIN_CLUSTER=n
@@ -137,7 +147,7 @@ CONFIG_SUPPORT_LAUNDRY_WASHER_CONTROLS_CLUSTER=n
 CONFIG_SUPPORT_LAUNDRY_DRYER_CONTROLS_CLUSTER=n
 CONFIG_SUPPORT_WIFI_NETWORK_MANAGEMENT_CLUSTER=n
 CONFIG_SUPPORT_WINDOW_COVERING_CLUSTER=n
-CONFIG_SUPPORT_SUPPORT_WATER_HEATER_MANAGEMENT_CLUSTER=n
+CONFIG_SUPPORT_WATER_HEATER_MANAGEMENT_CLUSTER=n
 CONFIG_SUPPORT_WATER_HEATER_MODE_CLUSTER=n
 CONFIG_SUPPORT_ELECTRICAL_GRID_CONDITIONS_CLUSTER=n
 CONFIG_SUPPORT_COMMODITY_PRICE_CLUSTER=n
