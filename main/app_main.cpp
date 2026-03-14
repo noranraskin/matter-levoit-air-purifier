@@ -223,90 +223,26 @@ extern "C" void app_main()
         on_off_config.on_off = false;
         on_off::create(ep, &on_off_config, CLUSTER_FLAG_SERVER);
 
-        /* TODO: Re-enable HEPA Filter Monitoring when commissioning works
-        hepa_filter_monitoring::config_t hepa_config;
-        hepa_config.delegate = static_cast<void *>(&hepa_filter_delegate);
-        cluster_t *hepa_cluster = hepa_filter_monitoring::create(ep, &hepa_config, CLUSTER_FLAG_SERVER);
-        ABORT_APP_ON_FAILURE(hepa_cluster != nullptr, ESP_LOGE(TAG, "Failed to create HEPA filter monitoring cluster"));
-        attribute::create(hepa_cluster,
-                          HepaFilterMonitoring::Attributes::DegradationDirection::Id,
-                          ATTRIBUTE_FLAG_NONE, esp_matter_enum8(1));
-        attribute::create(hepa_cluster,
-                          HepaFilterMonitoring::Attributes::Condition::Id,
-                          ATTRIBUTE_FLAG_NONE, esp_matter_uint8(100));
-        resource_monitoring::feature::condition::config_t cond_feat;
-        cond_feat.degradation_direction = 1;
-        cond_feat.condition = 100;
-        resource_monitoring::feature::condition::add(hepa_cluster, &cond_feat);
-        */
+        //  ────────────────────────────────────────────────────────────
+        //   Start Matter
+        //  ────────────────────────────────────────────────────────────
+        err = esp_matter::start(app_event_cb);
+        ABORT_APP_ON_FAILURE(err == ESP_OK, ESP_LOGE(TAG, "Failed to start Matter, err:%d", err));
 
-        /* TODO: Re-enable Mode Select when commissioning works
-        cluster::mode_select::config_t mode_config;
-        snprintf(mode_config.description, sizeof(mode_config.description), "Operating Mode");
-        mode_config.current_mode = 0;
-        cluster::mode_select::create(ep, &mode_config, CLUSTER_FLAG_SERVER);
-        // NOTE: Must also add supported_modes entries (Manual/Sleep/Auto)
-        */
-    }
+        ESP_LOGI(TAG, "Matter stack started successfully");
+        ESP_LOGI(TAG, "Air Purifier endpoint: %d", air_purifier_endpoint_id);
 
-    /* TODO: Re-enable Endpoint 2 (Air Quality Sensor) when commissioning works
-    {
-        air_quality_sensor::config_t config;
-        endpoint_t *ep = air_quality_sensor::create(node, &config, ENDPOINT_FLAG_NONE, nullptr);
-        ABORT_APP_ON_FAILURE(ep != nullptr, ESP_LOGE(TAG, "Failed to create air quality sensor endpoint"));
-        air_quality_sensor_endpoint_id = endpoint::get_id(ep);
-        ESP_LOGI(TAG, "Air Quality Sensor endpoint created: %d", air_quality_sensor_endpoint_id);
-
-        pm25_concentration_measurement::config_t pm25_config;
-        pm25_config.measurement_medium = 0;
-        pm25_config.feature_flags = concentration_measurement::feature::numeric_measurement::get_id();
-        pm25_config.features.numeric_measurement.measurement_unit = 0;
-        pm25_concentration_measurement::create(ep, &pm25_config, CLUSTER_FLAG_SERVER);
-    }
-    */
-
-    /* TODO: Re-enable Endpoint 3 (Display Power) when commissioning works
-    {
-        on_off_plug_in_unit::config_t config;
-        config.on_off.on_off = true;
-        endpoint_t *ep = on_off_plug_in_unit::create(node, &config, ENDPOINT_FLAG_NONE, nullptr);
-        ABORT_APP_ON_FAILURE(ep != nullptr, ESP_LOGE(TAG, "Failed to create display power endpoint"));
-        display_power_endpoint_id = endpoint::get_id(ep);
-        ESP_LOGI(TAG, "Display Power endpoint created: %d", display_power_endpoint_id);
-    }
-    */
-
-    /* TODO: Re-enable Endpoint 4 (Display Lock) when commissioning works
-    {
-        on_off_plug_in_unit::config_t config;
-        config.on_off.on_off = false;
-        endpoint_t *ep = on_off_plug_in_unit::create(node, &config, ENDPOINT_FLAG_NONE, nullptr);
-        ABORT_APP_ON_FAILURE(ep != nullptr, ESP_LOGE(TAG, "Failed to create display lock endpoint"));
-        display_lock_endpoint_id = endpoint::get_id(ep);
-        ESP_LOGI(TAG, "Display Lock endpoint created: %d", display_lock_endpoint_id);
-    }
-    */
-
-    /* ────────────────────────────────────────────────────────────
-     *  Start Matter
-     * ──────────────────────────────────────────────────────────── */
-    err = esp_matter::start(app_event_cb);
-    ABORT_APP_ON_FAILURE(err == ESP_OK, ESP_LOGE(TAG, "Failed to start Matter, err:%d", err));
-
-    ESP_LOGI(TAG, "Matter stack started successfully");
-    ESP_LOGI(TAG, "Air Purifier endpoint: %d", air_purifier_endpoint_id);
-
-    /* ── Console commands (for development) ── */
+        // ── Console commands (for development) ──
 #if CONFIG_ENABLE_CHIP_SHELL
-    esp_matter::console::diagnostics_register_commands();
-    esp_matter::console::wifi_register_commands();
-    esp_matter::console::factoryreset_register_commands();
-    esp_matter::console::init();
+        esp_matter::console::diagnostics_register_commands();
+        esp_matter::console::wifi_register_commands();
+        esp_matter::console::factoryreset_register_commands();
+        esp_matter::console::init();
 #endif
 
-    /* ── Main loop ── */
-    while (true)
-    {
-        vTaskDelay(10000 / portTICK_PERIOD_MS);
+        /* ── Main loop ── */
+        while (true)
+        {
+            vTaskDelay(10000 / portTICK_PERIOD_MS);
+        }
     }
-}
