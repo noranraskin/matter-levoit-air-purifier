@@ -164,7 +164,7 @@ extern "C" void app_main()
 {
     esp_err_t err = ESP_OK;
 
-    /* Initialize NVS — with error recovery for corrupted partitions */
+    // Initialize NVS — with error recovery for corrupted partitions
     err = nvs_flash_init();
     if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND)
     {
@@ -174,29 +174,29 @@ extern "C" void app_main()
     }
     ESP_ERROR_CHECK(err);
 
-    /* ────────────────────────────────────────────────────────────
-     *  Create Matter Node (Root Node on Endpoint 0)
-     * ──────────────────────────────────────────────────────────── */
+    // ────────────────────────────────────────────────────────────
+    //  Create Matter Node (Root Node on Endpoint 0)
+    // ────────────────────────────────────────────────────────────
     node::config_t node_config;
     node_t *node = node::create(&node_config, app_attribute_update_cb, app_identification_cb);
     ABORT_APP_ON_FAILURE(node != nullptr, ESP_LOGE(TAG, "Failed to create Matter node"));
 
-    /* ────────────────────────────────────────────────────────────
-     *  Endpoint 1: Air Purifier (MINIMAL — Fan Control + On/Off only)
-     *
-     *  The air_purifier::create() gives us:
-     *    - Descriptor cluster (automatic)
-     *    - Identify cluster (automatic)
-     *    - Fan Control cluster (mandatory for Air Purifier device type)
-     *
-     *  We add On/Off and the Multi-Speed + Auto features for Fan Control.
-     *  HEPA Filter Monitoring and Mode Select are commented out until
-     *  commissioning is verified working.
-     * ──────────────────────────────────────────────────────────── */
+    // ────────────────────────────────────────────────────────────
+    //  Endpoint 1: Air Purifier (MINIMAL — Fan Control + On/Off only)
+    //
+    //  The air_purifier::create() gives us:
+    //    - Descriptor cluster (automatic)
+    //    - Identify cluster (automatic)
+    //    - Fan Control cluster (mandatory for Air Purifier device type)
+    //
+    //  We add On/Off and the Multi-Speed + Auto features for Fan Control.
+    //  HEPA Filter Monitoring and Mode Select are commented out until
+    //  commissioning is verified working.
+    // ────────────────────────────────────────────────────────────
     {
         air_purifier::config_t config;
-        config.fan_control.fan_mode = 0;          /* Off */
-        config.fan_control.fan_mode_sequence = 2; /* Off/Low/Med/High/Auto */
+        config.fan_control.fan_mode = 0;          // Off
+        config.fan_control.fan_mode_sequence = 2; // Off/Low/Med/High/Auto
         config.fan_control.percent_setting = static_cast<uint8_t>(0);
         config.fan_control.percent_current = 0;
 
@@ -205,7 +205,7 @@ extern "C" void app_main()
         air_purifier_endpoint_id = endpoint::get_id(ep);
         ESP_LOGI(TAG, "Air Purifier endpoint created: %d", air_purifier_endpoint_id);
 
-        /* Add Multi-Speed feature (3 speeds: Low, Med, High) */
+        // Add Multi-Speed feature (3 speeds: Low, Med, High)
         cluster_t *fan_cluster = cluster::get(ep, FanControl::Id);
         ABORT_APP_ON_FAILURE(fan_cluster != nullptr, ESP_LOGE(TAG, "Failed to get fan control cluster"));
 
@@ -215,10 +215,10 @@ extern "C" void app_main()
         multispeed.speed_current = 0;
         fan_control::feature::multi_speed::add(fan_cluster, &multispeed);
 
-        /* Add Auto feature */
+        // Add Auto feature
         fan_control::feature::fan_auto::add(fan_cluster);
 
-        /* Add On/Off cluster for master power */
+        // Add On/Off cluster for master power
         on_off::config_t on_off_config;
         on_off_config.on_off = false;
         on_off::create(ep, &on_off_config, CLUSTER_FLAG_SERVER);

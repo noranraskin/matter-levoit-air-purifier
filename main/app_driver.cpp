@@ -16,7 +16,7 @@ static const char *TAG = "app_driver";
 /* ── Driver Init (stub) ── */
 app_driver_handle_t app_driver_levoit_init(void)
 {
-    ESP_LOGI(TAG, "Levoit driver init (stub — no UART in minimal build)");
+    ESP_LOGI(TAG, "Levoit driver init. (stub — no UART in minimal build)");
     return NULL;
 }
 
