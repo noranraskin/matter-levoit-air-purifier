@@ -240,7 +240,7 @@ extern "C" void app_main()
         esp_matter::console::init();
 #endif
 
-        /* ── Main loop ── */
+        // ── Main loop ──
         while (true)
         {
             vTaskDelay(10000 / portTICK_PERIOD_MS);
