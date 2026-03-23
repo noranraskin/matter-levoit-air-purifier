@@ -81,6 +81,6 @@ chip-tool pairing ble-wifi 1 "YOUR_WIFI_SSID" "YOUR_WIFI_PASSWORD" 20202021 3840
 ## Credits & Acknowledgements
 This project would not be possible without the reverse-engineering efforts from the Home Assistant / ESPHome community.
 
-UART protocol reverse engineering and original ESPHome implementation inspired by: acvigue/esphome-levoit-air-purifier
+UART protocol reverse engineering and original ESPHome implementation inspired by: [acvigue/esphome-levoit-air-purifier](https://github.com/acvigue/esphome-levoit-air-purifier)
 
-CADR rates and filter life calculation tracking logic inspired by:mulcmu/esphome-levoit-core300s
+CADR rates and filter life calculation tracking logic inspired by: [mulcmu/esphome-levoit-core300s](https://github.com/mulcmu/esphome-levoit-core300s)
